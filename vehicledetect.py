@@ -57,9 +57,9 @@ def draw_labeled_bboxes(img, labels):
 
 #
 # used for debuggin - dump the bboxes on the image
-def draw_bboxes(img, bboxes):
+def draw_bboxes(img, bboxes,box_color=(255,0,0)):
     for bbox in bboxes:
-        cv2.rectangle(img, bbox[0], bbox[1], (255,0,0), 6)
+        cv2.rectangle(img, bbox[0], bbox[1], box_color, 6)
 
 
 #
@@ -376,7 +376,6 @@ def find_cars(img, ystart, ystop, scale, svc, X_scaler, orient, pix_per_cell, ce
     return draw_img, box_list,decision_list,debug_boxes
 
 # this could be a class - probably would be cleaner than globals
-heat_map_history = []
 box_history = []
 frame_number = 0
 num_vehicles = 0
@@ -385,7 +384,6 @@ last_boxes = []
 # clear the pipeline before running
 def initializePipeline():
     global frame_number
-    global heat_map_history
     global box_history
     global num_vehicles
     global last_boxes
@@ -393,15 +391,56 @@ def initializePipeline():
     num_vehicles = 0
 
     box_history = []
-    heat_map_history=[]
     last_boxes = []
 
 #
 # this is the main pipeline
 #
+def getWindowParameters():
+    find_car_params = [
+     { "out_img": [] , "box_list":[], "decision_list":[], "debug_boxes":[], "ystart": 380, "yend": 660, "scale": 2.5},
+     { "out_img": [] , "box_list":[], "decision_list":[], "debug_boxes":[], "ystart": 380, "yend": 656, "scale": 2},
+     { "out_img": [] , "box_list":[], "decision_list":[], "debug_boxes":[], "ystart": 380, "yend": 656, "scale": 1.5},
+     { "out_img": [] , "box_list":[], "decision_list":[], "debug_boxes":[], "ystart": 380, "yend": 550, "scale": 1.75},
+     { "out_img": [] , "box_list":[], "decision_list":[], "debug_boxes":[], "ystart": 380, "yend": 530, "scale": 1.25}
+    ]
+    return find_car_params
+
+def drawDebugBoxes(fcp,image,hilightcolor=(255,255,255),box_color=(255,0,0)):
+        debug_box=fcp["debug_boxes"]
+        debug_image=np.copy(image)
+        draw_bboxes(debug_image,debug_box,box_color=box_color)
+        cv2.rectangle(debug_image, debug_box[0][0], debug_box[0][1], hilightcolor, 6)
+        return debug_image
+
+#
+#  We use both canny edge detection, and the decision property to remove things that don't look like cars
+#  this improves the false positives by a big margin
+def rejectFrames(image,box_list,dec_list,debug):
+    box_list_trunc=[]
+    i=0
+    for bbox in box_list:
+        cropped = image[bbox[0][1]:bbox[1][1], bbox[0][0]:bbox[1][0]]
+        canny = cv2.Canny(cropped,128,255)
+        nz=np.count_nonzero(canny)
+        px=canny.shape[0]*canny.shape[1]
+        pc=nz/px*1.
+        PCS=""
+        if (pc>0.06): PCS="*"
+        decs=""
+        if (dec_list[i]>0.75): decs="*"
+        if debug:
+            print('decision:',dec_list[i],decs,' pc:',pc,PCS)
+            decs=""
+            plt.imshow(cropped)
+            plt.show()
+        if (pc>0.06 and dec_list[i]>0.55):
+            box_list_trunc.append(bbox)
+        i=i+1
+    return box_list_trunc 
+
 def carDetectionPipeline(image,debug=False):
     global frame_number
-    global heat_map_history
     global box_history
     global num_vehicles
     global last_boxes
@@ -423,88 +462,27 @@ def carDetectionPipeline(image,debug=False):
     # This is not optimized, probably overkill
     # 
 
-    find_car_params = [
-     { "out_img": [] , "box_list":[], "decision_list":[], "debug_boxes":[], "ystart": 380, "yend": 660, "scale": 2.5},
-     { "out_img": [] , "box_list":[], "decision_list":[], "debug_boxes":[], "ystart": 380, "yend": 656, "scale": 2},
-     { "out_img": [] , "box_list":[], "decision_list":[], "debug_boxes":[], "ystart": 380, "yend": 656, "scale": 1.5},
-     { "out_img": [] , "box_list":[], "decision_list":[], "debug_boxes":[], "ystart": 380, "yend": 550, "scale": 1.75},
-     { "out_img": [] , "box_list":[], "decision_list":[], "debug_boxes":[], "ystart": 380, "yend": 530, "scale": 1.25}
- ]
 
     box_list=[]
     dec_list=[]
     debug_boxes=[]
+    find_car_params = getWindowParameters()
     for fcp in find_car_params:
        fcp["out_img"], fcp["box_list"],fcp["decision_list"],fcp["debug_boxes"] = find_cars(image, fcp["ystart"],fcp["yend"],fcp["scale"], svc, X_scaler, orient, pix_per_cell, cell_per_block, spatial_size, hist_bins,color_space)
        box_list = box_list + fcp["box_list"]
        debug_boxes = debug_boxes + fcp["debug_boxes"]
        dec_list = dec_list+ fcp["decision_list"]
 
-    #debug_boxes=[None]*5
-    #box_list= box_list1+box_list2+box_list3+box_list4+box_list5
-    #dec_list= decision_list1+decision_list2+decision_list3+decision_list4+decision_list5
-
-    #out_img, box_list1,decision_list1,debug_boxes[0] = find_cars(image, 400, 660, 2.5, svc, X_scaler, orient, pix_per_cell, cell_per_block, spatial_size, hist_bins,color_space)
-    #out_img, box_list2 ,decision_list2,debug_boxes[1]= find_cars(image, 400, 656, 2, svc, X_scaler, orient, pix_per_cell, cell_per_block, spatial_size, hist_bins,color_space)
-    #out_img, box_list3,decision_list3,debug_boxes[2] = find_cars(image, 380, 656, 1.5, svc, X_scaler, orient, pix_per_cell, cell_per_block, spatial_size, hist_bins,color_space)
-    #out_img, box_list4 ,decision_list4,debug_boxes[3]= find_cars(image, 400, 550, 1.75, svc, X_scaler, orient, pix_per_cell, cell_per_block, spatial_size, hist_bins,color_space)
-    #out_img, box_list5 ,decision_list5,debug_boxes[4]= find_cars(image, 400, 530, 1.25, svc, X_scaler, orient, pix_per_cell, cell_per_block, spatial_size, hist_bins,color_space)
-    #box_list= box_list1+box_list2+box_list3+box_list4+box_list5
-    #dec_list= decision_list1+decision_list2+decision_list3+decision_list4+decision_list5
-    
-
-    #
-    # code to show the rectangles for each of the steps above
-    #
-    if debug:
-            for i in range(0,len(debug_boxes)):
-                debug_image=np.copy(image)
-                draw_bboxes(debug_image,debug_boxes[i])
-                cv2.rectangle(debug_image, debug_boxes[i][0][0], debug_boxes[i][0][1], (255,255,255), 6)
-
-                plt.imshow(debug_image)
-                plt.show()
-
     #
     #  We use both canny edge detection, and the decision property to remove things that don't look like cars
     #  this improves the false positives by a big margin
-    box_list_trunc=[]
-    i=0
-    for bbox in box_list:
-            cropped = image[bbox[0][1]:bbox[1][1], bbox[0][0]:bbox[1][0]]
-            canny = cv2.Canny(cropped,128,255)
-            nz=np.count_nonzero(canny)
-            px=canny.shape[0]*canny.shape[1]
-            pc=nz/px*1.
-            PCS=""
-            if (pc>0.06): PCS="*"
-            decs=""
-            if (dec_list[i]>0.75): decs="*"
-            if debug:
-                #print('decision:',dec_list[i],decs,' pc:',pc,PCS)
-                decs=""
-                #plt.imshow(cropped)
-                #plt.show()
-                #plt.imshow(canny)
-                #plt.show()
-                #plt.imshow(im2)
-                #plt.show()
+    box_list= rejectFrames(image,box_list,dec_list)
 
-            if (pc>0.06 and dec_list[i]>0.75):
-            #if (pc>0.06 and dec_list[i]>0.5):
-            #if (pc>0.09):
-                box_list_trunc.append(bbox)
-            i=i+1
-
-    
-    
-    box_list= box_list_trunc
     heat = np.zeros_like(image[:,:,0]).astype(np.float)
-    heat_sum = np.zeros_like(image[:,:,0]).astype(np.float)
     # Add heat to each box in box list
     heat = add_heat(heat,box_list)
     
-    # TODO what should the threshold be?  can we calculate something better?
+    heat_sum = np.zeros_like(image[:,:,0]).astype(np.float)
     
     # Apply threshold to help remove false positives
     heat = apply_threshold(heat,1)
@@ -520,11 +498,8 @@ def carDetectionPipeline(image,debug=False):
     draw_img = draw_labeled_bboxes(np.copy(image), labels)
 
     #
-    #  TODO We can store our bboxes and heatmaps between frames to improve the pipeline
+    #  store our bboxes and heatmaps between frames to improve the pipeline
     #
-    heat_map_history.append(heatmap)
-    if (len(heat_map_history) > 5):
-         del heat_map_history[0]
     box_history.append(box_list)
     if (len(box_history) > 5):
          del box_history[0]
@@ -545,7 +520,8 @@ def carDetectionPipeline(image,debug=False):
     #heat_sum = apply_threshold(heat_sum,heat_mean+(heat_std))
     #heat_sum = apply_threshold(heat_sum,20)
     # heat_sum = apply_threshold(heat_sum,17)  -- AJS GOOD
-    heat_sum = apply_threshold(heat_sum,20)
+    # TODO what should the threshold be?  can we calculate something better?
+    heat_sum = apply_threshold(heat_sum,15)
     heat_sum = np.clip(heat_sum, 0, 255)
 
 
@@ -636,9 +612,24 @@ def processCombinedVideo(input_video,output):
     out_clip.write_videofile(output,audio=False)
 
 
+from moviepy.editor import VideoFileClip
+def clipVideo(input_video,output,start,end):
+    initializePipeline()
+    clip1 = VideoFileClip(input_video)
+    clip1 = clip1.subclip(start,end)
+    out_clip = clip1.fl_image(combinedPipeline)
+    out_clip.write_videofile(output,audio=False)
+
+
+
+
 
 if __name__ == '__main__':
-    #processCombinedVideo('project_video.mp4','project_video_out.mp4')
-    processCombinedVideo('test_video.mp4','test_video_out.mp4')
+    processCombinedVideo('project_video.mp4','project_video_out.mp4')
+    #processCombinedVideo('test_video.mp4','test_video_out.mp4')
     #processCombinedVideo('../CarND-Advanced-Lane-Lines/challenge_video.mp4','challenge_video_out.mp4')
+    #clipVideo('test_video.mp4','test_video_clip.mp4',0,1)
+    #clipVideo('project_video.mp4','project_video_clip.mp4',22,23)
+    #clipVideo('project_video.mp4','project_video_clip.mp4',27,29)
+    #clipVideo('project_video.mp4','project_video_clip.mp4',19,20)
 
