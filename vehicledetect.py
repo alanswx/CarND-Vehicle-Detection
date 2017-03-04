@@ -15,6 +15,9 @@ from scipy.ndimage.measurements import label
 
 import lanefind
 
+#
+# turn bbox into heatmap by adding 1 for each pixel inside the bbox
+#
 def add_heat(heatmap, bbox_list):
     # Iterate through list of bboxes
     for box in bbox_list:
@@ -24,13 +27,19 @@ def add_heat(heatmap, bbox_list):
 
     # Return updated heatmap
     return heatmap
-    
+   
+#
+# apply a threshold to the heatmap to keep only "hot" areas
+# 
 def apply_threshold(heatmap, threshold):
     # Zero out pixels below the threshold
     heatmap[heatmap <= threshold] = 0
     # Return thresholded map
     return heatmap
 
+#
+# this function will draw the bounding boxes that labels returns
+#
 def draw_labeled_bboxes(img, labels):
     # Iterate through all detected cars
     for car_number in range(1, labels[1]+1):
@@ -46,11 +55,16 @@ def draw_labeled_bboxes(img, labels):
     # Return the image
     return img
 
+#
+# used for debuggin - dump the bboxes on the image
 def draw_bboxes(img, bboxes):
     for bbox in bboxes:
         cv2.rectangle(img, bbox[0], bbox[1], (255,0,0), 6)
 
 
+#
+# try to move all the color conversion into one function - to keep things straight
+#
 def convert_color(img, color_space='YCrCb'):
     if color_space != 'RGB':
         if color_space == 'HSV':
@@ -66,14 +80,6 @@ def convert_color(img, color_space='YCrCb'):
     else: feature_image = np.copy(img)      
     return feature_image
         
-# this one doesn't handle all color spaces
-def convert_color_old(img, conv='RGB2YCrCb'):
-    if conv == 'RGB2YCrCb':
-        return cv2.cvtColor(img, cv2.COLOR_RGB2YCrCb)
-    if conv == 'BGR2YCrCb':
-        return cv2.cvtColor(img, cv2.COLOR_BGR2YCrCb)
-    if conv == 'RGB2LUV':
-        return cv2.cvtColor(img, cv2.COLOR_RGB2LUV)
     
 # Define a function to return HOG features and visualization
 def get_hog_features(img, orient, pix_per_cell, cell_per_block, 
@@ -157,6 +163,10 @@ def extract_features(imgs, color_space='RGB', spatial_size=(32, 32),
     # Return list of feature vectors
     return features
 
+#
+# we pickle the model so that we don't have to recompute it each time
+# we first use the memory version, then load from disk, then compute (and save to disk)
+#
 dist_pickle = {}
 def loadModelPickle():
     global dist_pickle
@@ -167,7 +177,9 @@ def loadModelPickle():
         dist_pickle = pickle.load( open(pickle_file_name, "rb" ) )
     return dist_pickle
 
-
+#
+# fit the model, and save out the result to our pickle for later use
+#
 def fitModelAndPickle():
     cars = glob.glob('vehicles/*/*.png')
     notcars = glob.glob('non-vehicles/*/*.png')
@@ -180,8 +192,20 @@ def fitModelAndPickle():
 
     ### TODO: Tweak these parameters and see how the results change.
     #0.9809
-    if True:
+    if False:
         color_space = 'RGB' # Can be RGB, HSV, LUV, HLS, YUV, YCrCb
+        orient = 9  # HOG orientations
+        pix_per_cell = 8 # HOG pixels per cell
+        cell_per_block = 2 # HOG cells per block
+        hog_channel = "ALL" # Can be 0, 1, 2, or "ALL"
+        spatial_size = (16, 16) # Spatial binning dimensions
+        hist_bins = 16    # Number of histogram bins
+        spatial_feat = True # Spatial features on or off
+        hist_feat = True # Histogram features on or off
+        hog_feat = True # HOG features on or off
+    #0.9907
+    if True:
+        color_space = 'YCrCb' # Can be RGB, HSV, LUV, HLS, YUV, YCrCb
         orient = 9  # HOG orientations
         pix_per_cell = 8 # HOG pixels per cell
         cell_per_block = 2 # HOG cells per block
@@ -266,7 +290,14 @@ def fitModelAndPickle():
 
     pickle.dump( dist_pickle, open( "svc_pickle.p", "wb" ) )
 
-
+#
+# This function takes a scale and a y range, and will stack up the data we need, and call predict on each square. 
+#
+# returns::
+#    draw_img:  an image that has bounding boxes drawn on it (not used)
+#    box_list:  a list of boxes that have someting of value
+#    decision_list: the probability the box is useful
+#    debug_boxes: used to show where the scan boxes are, for the writeup
 def find_cars(img, ystart, ystop, scale, svc, X_scaler, orient, pix_per_cell, cell_per_block, spatial_size, hist_bins,color_space):
     box_list = []
     decision_list=[]
@@ -351,6 +382,7 @@ frame_number = 0
 num_vehicles = 0
 last_boxes = []
 
+# clear the pipeline before running
 def initializePipeline():
     global frame_number
     global heat_map_history
@@ -364,6 +396,9 @@ def initializePipeline():
     heat_map_history=[]
     last_boxes = []
 
+#
+# this is the main pipeline
+#
 def carDetectionPipeline(image,debug=False):
     global frame_number
     global heat_map_history
@@ -371,6 +406,7 @@ def carDetectionPipeline(image,debug=False):
     global num_vehicles
     global last_boxes
 
+    # load the model from the pickle (or cache)
     dist_pickle = loadModelPickle()
     svc = dist_pickle["svc"]
     X_scaler = dist_pickle["scaler"]
@@ -382,36 +418,45 @@ def carDetectionPipeline(image,debug=False):
     color_space = dist_pickle["color_space"]
     accuracy_score = dist_pickle["accuracy_score"]
     #print('Test Accuracy of SVC = ', round(accuracy_score, 4))
-    
-    if (True or frame_number==0 or (frame_number % 5==0) or num_vehicles>0):
-        #print('full process: ',frame_number)
-    
-    
-        debug_boxes=[None]*5
-        out_img, box_list1,decision_list1,debug_boxes[0] = find_cars(image, 400, 660, 2.5, svc, X_scaler, orient, pix_per_cell, cell_per_block, spatial_size, hist_bins,color_space)
-        #plt.imshow(out_img)
-        #plt.show()
-        out_img, box_list2 ,decision_list2,debug_boxes[1]= find_cars(image, 400, 656, 2, svc, X_scaler, orient, pix_per_cell, cell_per_block, spatial_size, hist_bins,color_space)
-        #plt.imshow(out_img)
-        #plt.show()
-        #out_img, box_list3,decision_list3,debug_boxes[2] = find_cars(image, 400, 656, 1.5, svc, X_scaler, orient, pix_per_cell, cell_per_block, spatial_size, hist_bins,color_space)
-        out_img, box_list3,decision_list3,debug_boxes[2] = find_cars(image, 380, 656, 1.5, svc, X_scaler, orient, pix_per_cell, cell_per_block, spatial_size, hist_bins,color_space)
-        #plt.imshow(out_img)
-        #plt.show()
-        out_img, box_list4 ,decision_list4,debug_boxes[3]= find_cars(image, 400, 550, 1.75, svc, X_scaler, orient, pix_per_cell, cell_per_block, spatial_size, hist_bins,color_space)
-        #plt.imshow(out_img)
-        #plt.show()
-        out_img, box_list5 ,decision_list5,debug_boxes[4]= find_cars(image, 400, 530, 1.25, svc, X_scaler, orient, pix_per_cell, cell_per_block, spatial_size, hist_bins,color_space)
-        #plt.imshow(out_img)
-        #plt.show()
-        #out_img, box_list4 ,decision_list4,debug_boxes[3]= find_cars(image, 390, 719, 3, svc, X_scaler, orient, pix_per_cell, cell_per_block, spatial_size, hist_bins,color_space)
+   
+    # scan for cars with 5 different patterns
+    # This is not optimized, probably overkill
+    # 
 
-        
-        box_list= box_list1+box_list2+box_list3+box_list4+box_list5
-        dec_list= decision_list1+decision_list2+decision_list3+decision_list4+decision_list5
+    find_car_params = [
+     { "out_img": [] , "box_list":[], "decision_list":[], "debug_boxes":[], "ystart": 380, "yend": 660, "scale": 2.5},
+     { "out_img": [] , "box_list":[], "decision_list":[], "debug_boxes":[], "ystart": 380, "yend": 656, "scale": 2},
+     { "out_img": [] , "box_list":[], "decision_list":[], "debug_boxes":[], "ystart": 380, "yend": 656, "scale": 1.5},
+     { "out_img": [] , "box_list":[], "decision_list":[], "debug_boxes":[], "ystart": 380, "yend": 550, "scale": 1.75},
+     { "out_img": [] , "box_list":[], "decision_list":[], "debug_boxes":[], "ystart": 380, "yend": 530, "scale": 1.25}
+ ]
+
+    box_list=[]
+    dec_list=[]
+    debug_boxes=[]
+    for fcp in find_car_params:
+       fcp["out_img"], fcp["box_list"],fcp["decision_list"],fcp["debug_boxes"] = find_cars(image, fcp["ystart"],fcp["yend"],fcp["scale"], svc, X_scaler, orient, pix_per_cell, cell_per_block, spatial_size, hist_bins,color_space)
+       box_list = box_list + fcp["box_list"]
+       debug_boxes = debug_boxes + fcp["debug_boxes"]
+       dec_list = dec_list+ fcp["decision_list"]
+
+    #debug_boxes=[None]*5
+    #box_list= box_list1+box_list2+box_list3+box_list4+box_list5
+    #dec_list= decision_list1+decision_list2+decision_list3+decision_list4+decision_list5
+
+    #out_img, box_list1,decision_list1,debug_boxes[0] = find_cars(image, 400, 660, 2.5, svc, X_scaler, orient, pix_per_cell, cell_per_block, spatial_size, hist_bins,color_space)
+    #out_img, box_list2 ,decision_list2,debug_boxes[1]= find_cars(image, 400, 656, 2, svc, X_scaler, orient, pix_per_cell, cell_per_block, spatial_size, hist_bins,color_space)
+    #out_img, box_list3,decision_list3,debug_boxes[2] = find_cars(image, 380, 656, 1.5, svc, X_scaler, orient, pix_per_cell, cell_per_block, spatial_size, hist_bins,color_space)
+    #out_img, box_list4 ,decision_list4,debug_boxes[3]= find_cars(image, 400, 550, 1.75, svc, X_scaler, orient, pix_per_cell, cell_per_block, spatial_size, hist_bins,color_space)
+    #out_img, box_list5 ,decision_list5,debug_boxes[4]= find_cars(image, 400, 530, 1.25, svc, X_scaler, orient, pix_per_cell, cell_per_block, spatial_size, hist_bins,color_space)
+    #box_list= box_list1+box_list2+box_list3+box_list4+box_list5
+    #dec_list= decision_list1+decision_list2+decision_list3+decision_list4+decision_list5
     
 
-        if debug:
+    #
+    # code to show the rectangles for each of the steps above
+    #
+    if debug:
             for i in range(0,len(debug_boxes)):
                 debug_image=np.copy(image)
                 draw_bboxes(debug_image,debug_boxes[i])
@@ -419,48 +464,15 @@ def carDetectionPipeline(image,debug=False):
 
                 plt.imshow(debug_image)
                 plt.show()
-    else:
-        #
-        # THIS DOESN'T WORK
-        #
-        #print(' in else case ')
-        windows = last_boxes
-        hog_channel="ALL"
-        #windows2 = slide_window(image, x_start_stop=[None, None], y_start_stop=(400,660), 
-        #            xy_window=(96, 96), xy_overlap=(0.5, 0.5))
-        #windows = slide_window(image, x_start_stop=[None, None], y_start_stop=(400,660), 
-        #            xy_window=(64, 64), xy_overlap=(0.5, 0.5))
-        #windows = slide_window(image, x_start_stop=[None, None], y_start_stop=(400,660), 
-        #            xy_window=(64, 64), xy_overlap=(0.5, 0.5))
 
-        #box_list,dec_list = search_windows(image, windows, svc, X_scaler, color_space=color_space, 
-        #                spatial_size=spatial_size, hist_bins=hist_bins, 
-        #                orient=orient, pix_per_cell=pix_per_cell, 
-        #                cell_per_block=cell_per_block, 
-        #                hog_channel=hog_channel, spatial_feat=True, 
-        #                hist_feat=True, hog_feat=True)  
-        if debug:
-                debug_image=np.copy(image)
-                draw_bboxes(debug_image,windows)
-                cv2.rectangle(debug_image, windows[0][0], windows[0][1], (255,255,255), 6)
-
-                plt.imshow(debug_image)
-                plt.show()
-
-        #print(box_list)
-    
+    #
+    #  We use both canny edge detection, and the decision property to remove things that don't look like cars
+    #  this improves the false positives by a big margin
     box_list_trunc=[]
-
     i=0
     for bbox in box_list:
             cropped = image[bbox[0][1]:bbox[1][1], bbox[0][0]:bbox[1][0]]
             canny = cv2.Canny(cropped,128,255)
-            #im2, contours, hierarchy = cv2.findContours(canny,cv2.RETR_TREE,cv2.CHAIN_APPROX_NONE)
-            #areas = [cv2.contourArea(c) for c in contours]
-            #max_index = np.argmax(areas)
-            #cnt=contours[max_index]
-            #x,y,w,h = cv2.boundingRect(cnt)
-            #cv2.rectangle(cropped,(x,y),(x+w,y+h),(0,255,255),2)
             nz=np.count_nonzero(canny)
             px=canny.shape[0]*canny.shape[1]
             pc=nz/px*1.
@@ -487,10 +499,6 @@ def carDetectionPipeline(image,debug=False):
     
     
     box_list= box_list_trunc
-    
-    
-    
-    #print(box_list)
     heat = np.zeros_like(image[:,:,0]).astype(np.float)
     heat_sum = np.zeros_like(image[:,:,0]).astype(np.float)
     # Add heat to each box in box list
@@ -536,7 +544,8 @@ def carDetectionPipeline(image,debug=False):
     
     #heat_sum = apply_threshold(heat_sum,heat_mean+(heat_std))
     #heat_sum = apply_threshold(heat_sum,20)
-    heat_sum = apply_threshold(heat_sum,17)
+    # heat_sum = apply_threshold(heat_sum,17)  -- AJS GOOD
+    heat_sum = apply_threshold(heat_sum,20)
     heat_sum = np.clip(heat_sum, 0, 255)
 
 
