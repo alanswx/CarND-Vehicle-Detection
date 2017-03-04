@@ -476,7 +476,7 @@ def carDetectionPipeline(image,debug=False):
     #
     #  We use both canny edge detection, and the decision property to remove things that don't look like cars
     #  this improves the false positives by a big margin
-    box_list= rejectFrames(image,box_list,dec_list)
+    box_list= rejectFrames(image,box_list,dec_list,False)
 
     heat = np.zeros_like(image[:,:,0]).astype(np.float)
     # Add heat to each box in box list
