@@ -80,7 +80,7 @@ saver.restore(sess, model_name)
 print ('\n\nLoaded network {:s}'.format(model_name))
 from moviepy.editor import VideoFileClip
 def pipeLine(image):
-    image = lanefind.lanePipeline(image)
+    #image = lanefind.lanePipeline(image)
     image=labelFrame(sess, net, image)
     return image
 
@@ -89,6 +89,7 @@ def processCombinedVideo(input_video,output):
     out_clip = clip1.fl_image(pipeLine)
     out_clip.write_videofile(output,audio=False) 
 
-#processCombinedVideo('test_video.mp4','test_video_faster-rcnn-out.mp4')
-#processCombinedVideo('project_video.mp4','project_video_faster-rcnn-out.mp4')
-processCombinedVideo('bayshore.mp4','bayshore_faster-rcnn-out.mp4')
+if __name__ == '__main__':
+    #processCombinedVideo('test_video.mp4','test_video_faster-rcnn-out.mp4')
+    #processCombinedVideo('project_video.mp4','project_video_faster-rcnn-out.mp4')
+    processCombinedVideo('bayshore.mp4','bayshore_faster-rcnn-out.mp4')
