@@ -93,6 +93,8 @@ There are a couple of parts of this that I am not completely happy with. Unfortu
 
 #### Here is a link to the completed video:
  [video of opencv approach](./project_video_out.mp4)
+ 
+ [youtube opencv link](https://youtu.be/coEj3h9P2Vg)
 
 ### Next Steps
 
@@ -124,6 +126,8 @@ At first this seemed to be fairly quick. Unfortuantely I wasn't getting very man
 This code is in convnet-vehicledetect.py  -- it is really short and simple. It requires the github repo above as a library. Also, it requires the alexnet weights. A link is in that repo.  
 
  [video of convnets approach](./project_video_convnets_out.mp4)
+  [youtube convnets link](https://youtu.be/JZWOHDbtRNg)
+
 
 ### 2. Faster-RCNN_TF
 
@@ -137,7 +141,7 @@ This approach works amazingly well. It will also classify people, bikes, and mot
 faster-rcnn-vehicledetect.py  -- this code is super simple as well. It requires the github repo above, and seems to only work on python 2 not 3. It requires a download of VGG weights.
 
 [video of faster-rcnn approach](./project_video_faster-rcnn-out.mp4)
-
+[youtube faster rcnn link](https://youtu.be/dLwdY0S_8DY)
 ### Links to Data to keep testing and improving (from Udacity):
 
 Here are links to the labeled data for [vehicle](https://s3.amazonaws.com/udacity-sdc/Vehicle_Tracking/vehicles.zip) and [non-vehicle](https://s3.amazonaws.com/udacity-sdc/Vehicle_Tracking/non-vehicles.zip) examples to train your classifier.  These example images come from a combination of the [GTI vehicle image database](http://www.gti.ssr.upm.es/data/Vehicle_database.html), the [KITTI vision benchmark suite](http://www.cvlibs.net/datasets/kitti/), and examples extracted from the project video itself.   You are welcome and encouraged to take advantage of the recently released [Udacity labeled dataset](https://github.com/udacity/self-driving-car/tree/master/annotations) to augment your training data.  
