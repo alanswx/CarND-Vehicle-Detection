@@ -625,8 +625,8 @@ def clipVideo(input_video,output,start,end):
 
 
 if __name__ == '__main__':
-    processCombinedVideo('project_video.mp4','project_video_out.mp4')
-    #processCombinedVideo('test_video.mp4','test_video_out.mp4')
+    #processCombinedVideo('project_video.mp4','project_video_out.mp4')
+    processCombinedVideo('test_video.mp4','test_video_out.mp4')
     #processCombinedVideo('../CarND-Advanced-Lane-Lines/challenge_video.mp4','challenge_video_out.mp4')
     #clipVideo('test_video.mp4','test_video_clip.mp4',0,1)
     #clipVideo('project_video.mp4','project_video_clip.mp4',22,23)

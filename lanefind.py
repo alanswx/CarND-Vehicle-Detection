@@ -214,7 +214,7 @@ def projectBirdToImage(image):
 def findLanesByHistogram(binary_warped):
     # Assuming you have created a warped binary image called "binary_warped"
     # Take a histogram of the bottom half of the image
-    histogram = np.sum(binary_warped[binary_warped.shape[0]/2:,:], axis=0)
+    histogram = np.sum(binary_warped[int(binary_warped.shape[0]/2):,:], axis=0)
 
     # Find the peak of the left and right halves of the histogram
     # These will be the starting point for the left and right lines
@@ -283,7 +283,7 @@ def findLanesByHistogram(binary_warped):
 
 def findCurvature(leftx,rightx,ploty):
     # Define conversions in x and y from pixels space to meters
-    ym_per_pix = 30/720 # meters per pixel in y dimension
+    ym_per_pix = 30./720 # meters per pixel in y dimension
     xm_per_pix = 3.7/700 # meters per pixel in x dimension
 
     y_eval = np.max(ploty)
